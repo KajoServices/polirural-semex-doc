@@ -1,7 +1,7 @@
 # Overview
 The main goal of Text Mining is to help process vast amounts of information from structured and unstructured sources and discover new knowledge at a low cost. The application of text-mining techniques to online content found on forums or social media can provide quantification of rural attractiveness and different pressures on landscape, landscape planning, rural development planning, scenarios matching qualitative and quantitative indicators.
 
-# Sources of information
+# 1. Sources of information
 In this section we give a short overview of all possible sources of information, the type of information that should be extracted from each particular source type and techniques used to solve those tasks. 
 ## Texts
 ### General concepts
@@ -76,6 +76,6 @@ Each text should be converted to the list of keywords (bag of words) for Adaptiv
 Non-representative posts (see [Direct quotes](direct-quotes)) should be removed (or marked). Example: re-tweets on Twitter, posts from FB shared via Twitter, etc.
 **Technique**: NLP, a ratio based on texts *multiplicity* and *centrality*. A text that is compared to another text, for which this ratio is above certain threshold, is being considered as a "direct quote" and should be discarded from the streaming. 
 ## GDELT
-# Modules
-## Crawlers
-## API
+# 2. Modules
+## 2.1 Crawlers
+## 2.2 API
