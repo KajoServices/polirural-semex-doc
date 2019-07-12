@@ -76,6 +76,60 @@ Each text should be converted to the list of keywords (bag of words) for Adaptiv
 Non-representative posts (see [Direct quotes](direct-quotes)) should be removed (or marked). Example: re-tweets on Twitter, posts from FB shared via Twitter, etc.
 **Technique**: NLP, a ratio based on texts *multiplicity* and *centrality*. A text that is compared to another text, for which this ratio is above certain threshold, is being considered as a "direct quote" and should be discarded from the streaming. 
 ## GDELT
-# 2. Modules
-## 2.1 Crawlers
-## 2.2 API
+# System Components
+## 1. Streaming (from Social Media)
+### 1.1 Resources
+Twitter
+LinkedIn
+### 1.2 Normalizing Data from Social Media
+Data incoming from Social Media should pass stages of Normalization and Indexing in order to become available for analysis and queries:
+
+- Normalization (data marked with the asterisk (\*) does not pass through Normalization stage, if it is discarded, see **warning** below):
+	- cleaning up and tokenizing original text
+	- extraction of hashtags
+	- geo-parsing\* (**Warning**: a single document obtained from source can be split to several normalized documents if more than one geographical entity appears in it)
+	- semantic analysis:
+		- topic extraction\*
+		- NER
+		- topic modelling
+	- sentiment analysis:
+		- evaluation of [negative, neutral, positive] on the scale of [-1,..,1]
+	- masking out any "sensitive" information (names, phone numbers, emails, etc.)
+- Indexing:
+	- recording normalized document in Elasticsearch index
+
+**Warning:** Documents that are discarded at the stage of Normalization won't make it to Indexing and will only be available in their raw form, see.
+
+## 2. Crawlers
+## 3. Semantic Explorer
+### 3.1 Named Entity Recognition (NER)
+### 3.2 Geo-parser
+### 3.3 Topic Manager
+#### 3.3.1 Topic Extraction
+#### 3.3.2 Topic Modelling
+## 4. Storage
+### 4.1 Social Media
+There are two separate (and parallel) storage schemes used for data collected from Social Media streaming
+#### 4.1.1 Raw data
+- ****** (Elasticsearch cluster)
+
+**Raw data** is represented "as-is" (i.e. with preservation of all information that comes through our feed - every document contain all fields). Raw data is used for additional analysis on the later stages of the project (for example, to collect all information from a certain area regarding a chosen event or a policy). Raw data be periodically archived and deleted from the main database (time-frame to be defined in the project settings, and will be fine-tuned regarding the amount of data).
+
+Storage scheme: MongoDB cluster.
+
+**Warning:** the access to raw data will not be given to the "outside world" and can only be delegated by request to admins.
+ 
+#### 4.1.2 Normalized and Indexed data
+Normalized data will be indexed in the Elasticsearch cluster. In its turn, indexed data is a product of Normalization, as described in [1.2 Normalizing Data from Social Media](1-2-normalizing-data-from-social-media).
+
+**Warning:** Documents that are discarded at the stage of Normalization won't make it to Indexing and will only be available in their raw form.
+
+### 4.2 Texts
+#### 4.2.1 Raw data
+#### 4.2.2 Index
+## 5. Access to Data
+### 5.1 Queries in Domain Specific Language (DSL)
+#### 5.1.1 Social Media
+#### 5.1.2 Semantic features
+### 5.2 API
+### 5.3 Web-socket streaming
