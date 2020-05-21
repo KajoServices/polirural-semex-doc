@@ -1,3 +1,4 @@
+
 # Semantic Explorer API
 ## Root endpoint
 To see all available resources, go to: `/api/v1/?format=json`
@@ -63,19 +64,22 @@ By default sources are sorted by the field *created_by* descending (latest first
 For custom sorting use parameter `order_by` followed by the name of the field.
 
 Examples:
-Sorting by the owner (owners are users who create sources):
+Sorting by the owner (owners are users who create sources - in this particular case it will be sorted by username):
     https://semex.io/api/v1/library/?order_by=owner
 
 Sorting by language descending:
     https://semex.io/api/v1/library/?order_by=-lang
 
-To sorting by multiple fields use *order_by* parameter for each field:
+To sort by multiple fields use *order_by* parameter for each field:
     https://semex.io/api/v1/library/?order_by=-updated_at&order_by=-lang
 
 __WARNING:__ Order matters. Consider the following examples:
 Sort by `source_type`, and then - within a set of each source type - sort by `created_at` descending:
 
-	...&order_by=source_type&order_by=-created_at
+#### Sorting by nested fields
+It is also possible to sort by fields that are represented as objects (for example, `owner`) - in the following example the output is sorted by the name of organization, which is represented by owner.
+
+	...&order_by=-owner__profile__organization
 #### Filtering
 Use names of fields for filtering in the same manner as parameters (see "Parameters" above):
 
