@@ -1,4 +1,5 @@
 
+
 # Semantic Explorer API
 ## Root endpoint
 To see all available resources, go to: `/api/v1/?format=json`
@@ -75,12 +76,14 @@ To sort by multiple fields use *order_by* parameter for each field:
 
 __WARNING:__ Order matters. Consider the following examples:
 Sort by `source_type`, and then - within a set of each source type - sort by `created_at` descending:
+    https://semex.io/api/v1/library/?order_by=source_type&order_by=-created_at
+
 
 #### Sorting by nested fields
-It is also possible to sort by fields that are represented as objects (for example, `owner`) - in the following example the output is sorted by the name of organization, which is represented by owner.
+It is also possible to sort by fields that are represented as objects (for example, `owner`) - in the following example the output is sorted by the name of organization, which is represented by owner  (note that "name" is redundant, since this is a default field that represents an organization).
 
 	...&order_by=-owner__profile__organization
-#### Filtering
+### Filtering
 Use names of fields for filtering in the same manner as parameters (see "Parameters" above):
 
     https://semex.io/api/v1/library/
@@ -136,7 +139,7 @@ Examples:
         &created_at=2020 Feb|2020-03-05T12:15
         &updated_at=2 hours ago|now
 
-**WARNING!** In those cases *two values* are necessary: start and end date (divided by vertical bar). The following example will cause **400 Bad Request**:
+**WARNING!** In all given examples *two values* are necessary: start and end date (divided by vertical bar). The following example will cause **400 Bad Request**:
 
     https://semex.io/api/v1/library/
         &created_at=1 day ago
@@ -164,7 +167,7 @@ Filters based on time-ranges and reserved keywords are *inclusive*, i.e. they au
 Search endpoint is available at the following URL:
 https://semex.io/api/v1/search/?query=policy
 
-Search are performed by the text (or list of items) stored the following fields (properties): `text`, `text.<lang>`, `url`, `entities`.
+Searches are performed by the text (or list of items) stored in the following fields (properties): `text`, `text.<lang>`, `url`, `entities`.
 
 If search by a single field (or by several, but not all) is required, use `match` modifier on a chosen field(s):
 
@@ -184,11 +187,51 @@ Search can be combined with filters:
     	&created_at=last month
     	&loc_country=Belgium
     	&order_by=-created_at
+All the rules applied to the filtering of Regional Library is applicable in this case. All possible options for filtering can be found in schema of the resource:
+    https://semex.io/api/v1/search/schema?format=json
 
-#### Aggregated data (GET)
-Tweets can be aggregated by geo-location (path in the response content: `["features"][<docindex>]["geometry"]["coordinates"]`) and timestamp (path: `["features"][<docindex>]["properties"]["created_at"]`).
+There is one particular field that requires a special mention: `source_type`. Its value explains the origin of the document and in combination with `source_id` is used to track the original document.  The value in `source_type` always consists of three parts, each of which refers to module, application within the module and data model within application. For example, consider the following fragment:
 
-If any of aggregation parameter appear in the request, the response contains additional field "aggregations", where summarized number of documents are gathered in "buckets", and sorted accordingly (see below).
+    {
+        "created_at": "2020-04-12",
+        "updated_at": "2020-04-23",
+        "resource_uri": "/api/v1/library/5e92e8ba4dcefb2097391a17",
+        "source_id": "5e92e8ba4dcefb2097391a17",
+        "source_type": "app:sources:LibrarySource",
+        "text": [
+            "Migration of youth from <em>rural</em> <em>towns</em> to bigger cities due to lack of opportunities is a common phenomenon nowadays, resulting in the ageing of <em>rural</em> areas. Youngsters should feel themselves addressed by the affairs and future of their <em>towns</em> and the EU.",
+            "They should be involved in dialogues, aiming to find solutions for challenges, hence making <em>rural</em> <em>towns</em> and the EU attractive."
+        ],
+        "topics": [
+            "new town",
+            "city",
+            "inner city"
+        ],
+        "url": "https://europa.eu/regions-and-cities/programme/sessions/582_en"
+    }
+In this fragment the value of the field `source_type` equals to "app:sources:LibrarySource", which can be read as follows:
+- module: `app`
+- application: `sources`
+- data model: `LibrarySource`
+
+The value of the field `source_id` points to the document within this scheme.
+
+**NB:** This information is necessary only if you want to filter by source types (i.e. `&source_type=feed:twitter:tweet`). If you only want to reach the original document from the search results, the field `resource_uri` serves this purpose.
+
+Possible values:
+- `app:sources:LibrarySource`
+- `app:sources:Keyword`
+- `app:sources:ReadingList`
+- `app:accounts:Organization`
+- `app:regions:Landscape`
+- `app:regions:Region`
+- `feed:twitter:tweet`
+**Warning:** This list is extendable!
+
+### Aggregated data (GET)
+Documents can be aggregated by geo-location (path in the response content: `["features"][<docindex>]["geometry"]["coordinates"]`) and timestamp (path: `["features"][<docindex>]["properties"]["created_at"]`).
+
+If any of the aggregation parameters appear in the request, the response contains additional field “aggregations”, where a summarized number of documents are gathered in “buckets”, and sorted accordingly (see below).
 
 If you are interested in aggregated results only, it is possible not to include original documents entirely by setting `size` param to zero (see example below). In this case the field `features` will still be present in the response to comply with GeoJSON format, but it will be an empty list.
 
@@ -243,8 +286,8 @@ In Semantic Explorer database sentiment is stored in the field `polarity`. Date-
     	&agg_polarity__interval=90m
 
 This indicates calculation of the average sentiment for each timestamp bucket. In the example above in each bucket (1.5hrs long) in addition to `doc_count` will contain `avg_polarity`.
-#### User feedback (PATCH)
-A registered user can leave a feedback for any particular tweet:
+## User feedback (PATCH)
+A registered user can leave a feedback for any particular document:
 
     PATCH https://semex.io/api/v1/library/<source_id>/<paragraph_number>/?api_key=<user_api_key>&username=<username-or-email>
     Content-Type: application/json
@@ -280,9 +323,10 @@ A registered user can leave a feedback for any particular tweet:
 
 The comment will automatically be stamped with a date-time mark and a link to a user profile.
 **Warning**: feedback is a paragraph based. It is impossible (and useless) to leave a feedback for the whole document.
-**Warning**: feedback don't have history, i.e. it is possible only to *re-write* comment, but not to add one.  However, if a user wants to leave a feedback for an article that is already commented by someone else, a new comment will be added.
+**Warning**: 
+feedback don’t have history, i.e. it is possible only to re-write a comment, but not to add one. However, if a user wants to leave a feedback for an article that is already commented by someone else, a new comment will be added.
 
 The structure of the feedback itself is free-form for as long as user keep all valuable information in a form of dictionary under the `feedback` key. However, for the procedural simplicity we suggest keeping the following keys, when giving a feedback:
-*  `<fieldname>` - `<list>` of values that are considered as relevant to the subject of a current paragraph. This can either be a subset of original `topics` key, or entirely new topics, or combination of both. Class can also be Named Entity - for example, it is possible to change a label of the entity or discard the entity entirely, if it was detected mistakenly. By "class" here is meant a category or a keyword that somehow describes a topic of a given document. *Proposed implementation*: a checkbox'ed list of `topics`, from which checked items become `classes` in the feedback.
-* `relevant` - `<bool>` indicating whether a tweet (in its entirety) is relevant to the topic. This key is optional, if tweet is considered to be relevant, while a user wants to specify a list of classes (see above) or simply to leave a note.
+*  `<fieldname>` - `<list>` of values that are considered as relevant to the subject of a current paragraph. This can either be a subset of original `topics` key, or entirely new topics, or combination of both. Class can also be Named Entity - for example, it is possible to change a label of the entity or discard the entity entirely, if it was detected mistakenly. By "class" here is meant a category or a keyword that somehow describes a topic of a given document. *Example of  implementation*: a checkbox'ed list of `topics`, from which checked items become `classes` in the feedback.
+* `relevant` - `<bool>` indicating whether a found document (a tweet in its entirety or a paragraph of a library source) is relevant to the topic. This key is optional, if tweet is considered to be relevant, while a user wants to specify a list of classes (see above) or simply to leave a note.
 * `note` - `<str>` (optional) comment on the reason of leaving feedback.
