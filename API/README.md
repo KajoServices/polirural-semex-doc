@@ -571,7 +571,11 @@ Parameters:
 - `topic <str>` (multiple, at least 1 is mandatory) - can be any topic different from the root, but ideally it's subtopics.
 - `lang <str>` (optional, default "en") - if the topic is in a language different than English, it SHOULD be accompanied with a correct language code!
 - `source_type <str>` (multiple, optional, default "app:sources:LibrarySource") - source of documents. Options to choose from :
-	- "app:sources:LibrarySource"
-	- "feed:twitter:tweet"
-	- more to come...
+  	- `app:sources:LibrarySource`
+	- `app:sources:Keyword`
+	- `app:sources:ReadingList`
+	- `app:accounts:Organization`
+	- `app:regions:Landscape`
+	- `app:regions:Region`
+	- `feed:twitter:tweet`
 - `topn <int>` (optional, default 10) - how many documents from each source should be returned.
