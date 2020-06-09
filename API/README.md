@@ -3,8 +3,8 @@
 # Semantic Explorer API
 ## Root endpoint
 To see all available resources, go to: `/api/v1/?format=json`
-## Resource calls
-Resource consists of data and schema.
+## Resources
+Each Resource is represented by two endpoints: data and schema.
 
 Resource data: `/api/v1/<<resource_name>>/?format=json`
 Example: `/api/v1/library/?format=json`
@@ -12,8 +12,15 @@ Example: `/api/v1/library/?format=json`
 Resource schema: `/api/v1/<<resource_name>>/schema/?format=json`
 Example: `/api/v1/user/schema/?format=json`
 
+Schema endpoint describes the structure of the response:
+- allowed methods
+- fields (types, options, etc.)
+- possible filtering
+- ordering
+
 ## Representation
 Resource's default mode of representation is a list of objects.
+
 Every single object has a `resource_uri` attribute, which leads to a detailed representation of a particular object.
 
 In the list mode `meta` container displays limit and offset (see parameters below), URLs for previous and next portion of data (in case limit and offset are used) and total number of records in the output.
@@ -286,7 +293,7 @@ In Semantic Explorer database sentiment is stored in the field `polarity`. Date-
     	&agg_polarity__interval=90m
 
 This indicates calculation of the average sentiment for each timestamp bucket. In the example above in each bucket (1.5hrs long) in addition to `doc_count` will contain `avg_polarity`.
-## User feedback (PATCH)
+### User feedback (PATCH)
 A registered user can leave a feedback for any particular document:
 
     PATCH https://semex.io/api/v1/library/<source_id>/<paragraph_number>/?api_key=<user_api_key>&username=<username-or-email>
@@ -330,3 +337,241 @@ The structure of the feedback itself is free-form for as long as user keep all v
 *  `<fieldname>` - `<list>` of values that are considered as relevant to the subject of a current paragraph. This can either be a subset of original `topics` key, or entirely new topics, or combination of both. Class can also be Named Entity - for example, it is possible to change a label of the entity or discard the entity entirely, if it was detected mistakenly. By "class" here is meant a category or a keyword that somehow describes a topic of a given document. *Example of  implementation*: a checkbox'ed list of `topics`, from which checked items become `classes` in the feedback.
 * `relevant` - `<bool>` indicating whether a found document (a tweet in its entirety or a paragraph of a library source) is relevant to the topic. This key is optional, if tweet is considered to be relevant, while a user wants to specify a list of classes (see above) or simply to leave a note.
 * `note` - `<str>` (optional) comment on the reason of leaving feedback.
+
+### Semantic Analysis
+
+All endpoints described above provide access to data that has already been analyzed by the Semantic Explorer and  saved in the database or indexes in the search engine. In addition to that there is a set of endpoints that provide direct access to the semantic features on the text.
+
+#### Request type and structure
+Semantic features can be accessed directly only by POST requests.
+
+General form of the request (example made with `curl` command):
+
+    curl --request POST 'https://semex.io/api/v1/analyze/?username=<username>&api_key=<api_key>' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "text": "<text>",
+        "pipeline": [<item1>, <item2>, ..., <itemN>],
+        "lang": "<lang>"
+    }'
+
+Only registered users can access semantic features, therefore absent or wrong `username` and `api_key` will generate `401 Unauthorized` error.
+
+**Warning!** It is very important to set a correct language, if it is known. If the language is not provided, the system will detect it, but this would cost an overhead. If the language is set incorrectly, Semantic Explorer will use it for analysis, which can make outcome quite surprising.
+
+#### The Pipeline
+The main parameter of Semantic Analysis endpoint is the `pipeline`. It is a list of strings or dictionaries that describe what kind(s) of analysis should be performed on the text.
+
+Each element in the list can either be a string (name of action) or a dictionary (name of action with parameters).
+
+Example of plain list (actions are performed with the default parameters):
+
+    {
+        "text": "<text>",
+        "lang": "<lang>",
+        "pipeline": ["tokens", "ner", "topics"]
+    }
+
+To change the default parameters of each action use the following form:
+
+    {
+        ...
+        "pipeline": [
+            {
+                "action": "tokens",
+                "params": {
+                    "lemmatize": true
+                }
+            },
+            {
+                "action": "vectors",
+                "params": {
+                    "topn": 50
+                }
+            }
+        ]
+    }
+
+It is possible to combine those two forms in the same call:
+
+    {
+        "text": "<text>",
+        "lang": "<lang>",
+        "pipeline": [
+            "tokens",
+            {
+                "action": "vectors",
+                "params": {
+                    "topn": 20
+                }
+            },
+            "topics"
+        ]
+    }
+
+#### Actions
+Every action is a singular procedure that is performed on a given text. Actions are grouped in the chain and each of them affects results on the later stages in the chain. For example if both `tokens` and `vectors` are requested and the action `tokens` was accompanied by param `lemmatize=true` (see below), then `vectors` will return word vectors of lemmas instead of vectors of original words. All dependencies and parameters are described for each action below. 
+
+Semantic Explorer supports the following actions:
+
+##### tokens
+Text cleaned up from stop-words, special symbols and punctuation marks.
+
+Parameters:
+- `lemmatize <boolean>` (default `false`) - if it is set to `true`, each token will be represented by its lemma: [https://en.wikipedia.org/wiki/Lemma_(morphology)](https://en.wikipedia.org/wiki/Lemma_(morphology))
+
+##### vectors
+L2 norm vector of words found in text - for details see [https://spacy.io/usage/vectors-similarity](https://spacy.io/usage/vectors-similarity).
+
+Parameters:
+- `topn <int>` (default 10) - top N words sorted by normalized value of the vector
+
+##### ner
+Named Entity Recognition [https://en.wikipedia.org/wiki/Named-entity_recognition](https://en.wikipedia.org/wiki/Named-entity_recognition).
+
+Parameters:
+- `distinct <boolean>` (default `false`) - if `true` Named Entities are grouped for the whole text and only labels and text of each entity is returned, otherwise all entities with their appearance in the text (accompanied by `start_char` and `end_char`). Entity labels are described here [https://spacy.io/api/annotation#named-entities](https://spacy.io/api/annotation#named-entities)
+
+##### ner_rendered
+
+HTML formatted version of `ner`. No parameters.
+
+##### noun_chunks
+Objects and subjects of all sentences of the text - the result of Parts of Speech tagging [https://spacy.io/usage/linguistic-features#pos-tagging](https://spacy.io/usage/linguistic-features#pos-tagging). No parameters.
+
+##### polarity
+Estimated value of sentiment on the scale from -1.0 to 1.0, where values around -1.0 are very negative, close to 0.0 are neutral, and close to +1.0 are very positive.
+
+Parameters:
+- `level <str>` of analysis. Possible values:
+	- `text` or `t` (default) - get sentiment for the whole text
+	- `paragraph` or `p` - split text to paragraphs and return estimation of sentiment for each paragraph
+	- `sentence` or `s` - split text to sentences and return estimation of sentiment for each sentence.
+
+##### summary
+Text summary, i.e. the most representative sentences from the text.
+
+Parameters:
+	- `keywords <int>` (default 15) - defined how many top keywords are used to summarize the document (the bigger the number of keywords, the broader the summary).
+	- `sentences <int>` (default 5) - how many sentences should be returned.
+
+##### topics
+Extraction of topics as if answering the question "what this text is about, in general?" This is highly dependent on the thesaurus - current implementation of topic extraction in semex.io  is based on GEMET [https://www.eionet.europa.eu/gemet/en/about/](https://www.eionet.europa.eu/gemet/en/about/).
+
+Parameters:
+- `keywords <int>` (default 15) - same as in `summary`
+- `max_topics <int>` (default 10) - the maximum number of topics to be returned (the response is always ordered by the relevance of the topics descending - the most relevant at the top)
+
+
+#### Inputs
+There can be three types of input:
+- `text` - plain text of an arbitrary length.
+- `url` - a proper URL pointing to some text in the internet. In this case the URL is first scraped (which adds overhead to the response depending on the source size)
+- `source_id` - a unique ID of the source from the Regional Library (this is generally not necessary, since all the documents from Regional Library are being constant;y updated and analyzed).
+
+Example of analyzing a text:
+
+    curl --request POST 'https://semex.io/api/v1/analyze/?username=<username>&api_key=<api_key>' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "text": "The productivity of a region'\''s farms is important for many reasons. Aside from providing more food, increasing the productivity of farms affects the region'\''s prospects for growth and competitiveness on the agricultural market, income distribution and savings, and labour migration. An increase in a region'\''s agricultural productivity implies a more efficient distribution of scarce resources. As farmers adopt new techniques and differences, the more productive farmers benefit from an increase in their welfare while farmers who are not productive enough will exit the market to seek success elsewhere",
+        "pipeline": [
+        	"polarity",
+        	{
+        	"action": "topics",
+        	"params": {"max_topics": 3, "keywords": 15}
+        	}
+        ],
+        "lang": "en"
+    }'
+
+Example of analyzing URL:
+
+    curl --request POST 'https://semex.io/api/v1/analyze/?username=<username>&api_key=<api_key>' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+    	"url": "https://en.wikipedia.org/wiki/Agricultural_productivity",
+        "pipeline": [
+        	{
+        		"action": "summary",
+        		"params": {
+        			"sentences": 6
+        		}
+        	},
+        	"noun_chunks"
+        ],
+    	"lang": "en"
+    }'
+
+Example of analyzing a document from the Regional Library:
+
+    curl --location --request POST 'https://semex.io/api/v1/analyze/?username=<username>&api_key=<api_key>' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "source_id": "5df73a3d5ae4c68142634e9f",
+        "pipeline": [
+        	"tokens",
+        	{
+        		"action": "ner_rendered"
+        	},
+        	{
+        		"action": "topics",
+        		"params": {
+        			"max_topics": 5
+        		}
+        	}
+        ],
+        "lang": "en"
+    }'
+
+#### Similarity Cluster
+Similarity Cluster is a general model based on thesaurus, where topics and subtopics are represented as a directed graph with the topic as a root and its subtopics as nodes. If a node has children, it is considered to be a topic on its level, while his children are subtopics.
+
+NB: It is only a representation up to a certain number of levels (normally 3) that can be considered as a directed graph. In reality, the graph is non-directed because the root topic can be a subtopic of the topic on a deeper levels. Similarity cluster is a dynamic structure and is being built in real-time, which allows to add new topics at any time.
+
+Similarity Cluster for a particular topic can be obtained by GET request:
+
+    https://semex.io/api/v1/similarity_cluster/
+        ?topic=zonas rurales
+        &lang=es
+        &threshold=0.6
+        &depth=3
+        &username=<username>
+        &api_key=<api_key>
+
+Parameters:
+- `topic <str>` (mandatory)
+- `lang <str>` (optional, default **'en'**) - if the topic is in a language different than English, it SHOULD be accompanied with a correct language code!
+- `depth <int>` (optional, default 2) - how deep to dive (**warning:** the deeper, the longer the response!):
+	- 1 find only nearest neighbors
+	- 2 return subtopics for each subtopics of the main topic
+	- 3 one level deeper,
+	- 4 etc.
+- `threshold <float>` (optional, default 0.6) - minimal similarity to consider a subtopic (internally - a distance between normalized vectors of  topic and subtopics).
+- `topn <int>` (optional, default 10) - how many similar topics should be returned. NOTE: the first node has `topn` subtopics, but the nodes in further levels have `topn-1` subtopics.
+
+#### Topic browser
+Endpoint that connects Similarity Cluster and data in Regional Library and/or Curated Reading List and/or Social Media feed. In other words, for the defined set of subtopics it returns documents from the selected resource(s) (for example, from Regional Library and Social Media feed) that are categorized by those topics. 
+
+GET request:
+
+    https://semex.io/api/v1/topic_browser/
+        ?root=rural area
+        &topic=urban area
+        &topic=rural population
+        &topic=rural environment
+        &lang=en
+        &source_type=app:sources:LibrarySource
+        &topn=10
+        &username=<username>
+        &api_key=<api_key>
+
+Parameters:
+- `root <str>` (mandatory) - root topic from Similarity Cluster
+- `topic <str>` (multiple, at least 1 is mandatory) - can be any topic different from the root, but ideally it's subtopics.
+- `lang <str>` (optional, default "en") - if the topic is in a language different than English, it SHOULD be accompanied with a correct language code!
+- `source_type <str>` (multiple, optional, default "app:sources:LibrarySource") - source of documents. Options to choose from :
+	- "app:sources:LibrarySource"
+	- "feed:twitter:tweet"
+	- more to come...
+- `topn <int>` (optional, default 10) - how many documents from each source should be returned.
