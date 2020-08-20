@@ -1,5 +1,6 @@
 
 
+
 # Semantic Explorer API
 ## Root endpoint
 To see all available resources, go to: `/api/v1/?format=json`
@@ -90,13 +91,10 @@ Sort by `source_type`, and then - within a set of each source type - sort by `cr
 It is also possible to sort by fields that are represented as objects (for example, `owner`) - in the following example the output is sorted by the name of organization, which is represented by owner  (note that "name" is redundant, since this is a default field that represents an organization).
 
 	...&order_by=-owner__profile__organization
-### Filtering
+#### Filtering
 Use names of fields for filtering in the same manner as parameters (see "Parameters" above):
 
-    https://semex.io/api/v1/library/
-        ?username=username
-        &api_key=4f23...d3c4
-        &source_type=text/html
+    https://semex.io/api/v1/library/?source_type=text/html
 
 Filters can be combined:
 
@@ -115,8 +113,7 @@ The resulting list of objects can be sorted:
         &size_src__lte=500
         &order_by=-updated_at
 
-#### Filtering by created_at and updated_at
-##### Time range
+#### Time Range Filters
 In addition to the standard modifiers (`__gt`, `__lte`, etc.) filtering by date fields (`created_at` and `updated_at`) can be performed using time ranges. Time-range is a string that consists of two dates (start and end), divided by vertical bar (|):
 
     https://semex.io/api/v1/library/
@@ -155,7 +152,7 @@ If the goal is to filter the records for the last day, use the following request
 
     https://semex.io/api/v1/library/
         &created_at=1 day ago|now
-##### Reserved keywords
+#### Reserved keywords for Time Range Filters
 Finally, there are reserved keywords, that don't require a pair of values: `today`, `yesterday`, `this week`, `last week`, `this month`, `last month`, `this year`, `last year`.
 
     https://semex.io/api/v1/library/
@@ -169,6 +166,66 @@ Filters based on time-ranges and reserved keywords are *inclusive*, i.e. they au
 
     https://semex.io/api/v1/library/
         ?created_at=2019-12-31T00:00:00|2019-12-31T23:59:59
+
+### Curated Reading List
+Curated Reading List (CRL) is a collection of sources on a certain topic or a list of topics (by "topic" here an abstract topic is meant, not the "topic" object in the Semantic Explorer).
+#### List of CRLs (GET)
+Access to the list of CRL: https://semex.io/api/v1/crl/?username=username&api_key=4f23...d3c4
+All mechanisms of filtering and sorting are available in the same way as for Library Sources.
+**Warning**: only registered users can access CRL endpoints.
+
+#### CRL detail (GET)
+Detailed view of a certain CRL can be accessed in the following way:
+https://semex.io/api/v1/crl/crl_id/?username=username&api_key=4f23...d3c4
+where `crl_id` is a UUID returned after the creation, or can be found in the list.
+
+#### New CRL (POST)
+Example of creating a new CRL (warning: URLs are fictional, use your own list of links):
+
+    POST https://semex.io/api/v1/crl/?username=username&api_key=4f23...d3c4 \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "name": "Rural Demographics",
+        "description": "Demographic change",
+        "sources": [
+            "https://ec.eu/eurostat/statistics_EU",
+            "https://cor.eu/en/engage/studies/Documents/The%20impact.pdf",
+            "https://espon.eu/sites/default/Regions.pdf",
+            "https://www.lulla.com/2018/12/22/the-challenge-of-rural-depopulation/#4d74a7a81295",
+            "http://landmobility.gr/",
+         ]
+    }'
+
+Internally CRL is a collection of URLs and therefore in principle it isn't connected to Regional Library. However, every time a new CRL is created, all the links are added to the library for the faster processing in the future. This explains, why upon creation of a CRL the server only returns the status and `_id`: in order to fill CRL with data, a series if asynchronous background processes take place:
+- checking the presence of each resource is in the Library
+- creating those that aren't: crawling, extracting text, analyzing it semantically
+- getting summary from each text and collecting it in a one big bag-of-sentences
+- performing a summary analysis on the bag-of-sentences
+- indexing CRL's text fields and performing semantic analysis on the resulting summary (NER, geo-parsing, topic extraction, polarity estimation, etc.)
+
+One way to check if the processing of CRL is finished is to periodically request its `_id` (returned after the creation):
+https://semex.io/api/v1/crl/crl_id/?username=username&api_key=4f23...d3c4,
+where `crl_id` is a UUID returned after the creation.
+The indicator that processing is finished would be data in the field `summary` (which is an empty list right after creation).
+#### Updating CRL (PUT, PATCH)
+To update only certain fields of a CRL a `PATCH` request should be issued:
+
+    PATCH https://semex.io/api/v1/crl/?username=username&api_key=4f23...d3c4 \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "sources": [
+            "https://ec.eu/eurostat/new_statistics_EU",
+            "https://cor.eu/en/engage/studies/Documents/TheGimpact.pdf",
+            "https://espon.eu/sites/default/Regions.pdf",
+            "https://www.lulla.com/2018/12/22/the-challenge-of-rural-depopulation/#4d74a7a81295",
+            "http://landmobility.gr/",
+         ]
+    }'
+A background processing will take place only if the field `sources` is changed - in this case the fields `summary`, `keywords`, and `urls_ext` are cleared up, and then the process will be repeated in the same way and order as after the creation of a CRL. In all other cases only field update takes place.
+**Warning**: if the list of sources should be changed, all URLs must be provided - not only those that are added to existing list.
+`PUT` request means full update, i.e. all fields will be re-written. If values for some required fields aren't provided in `PUT`, it will cause an error `400 Bad Request`.
+#### Deleting CRL (DELETE)
+No users are authorized to delete a CRL except of admins. For CRL to disappear from the list, it is advisable to set their status `is_active` to `"false"` and to display list filtered by adding parameter `&is_active=true` to the list.
 
 ### Search
 Search endpoint is available at the following URL:
@@ -298,8 +355,6 @@ A registered user can leave a feedback for any particular document:
 
     PATCH https://semex.io/api/v1/library/<source_id>/<paragraph_number>/?api_key=<user_api_key>&username=<username-or-email>
     Content-Type: application/json
-    Connection: keep-alive
-    cache-control: no-cache
     data = '{
         "feedback": {
             "topics": [
@@ -312,8 +367,6 @@ A registered user can leave a feedback for any particular document:
 
     PATCH https://semex.io/api/v1/library/<source_id>/<paragraph_number>/?api_key=<user_api_key>&username=<username-or-email>
     Content-Type: application/json
-    Connection: keep-alive
-    cache-control: no-cache
     data = '{
         "feedback": {
             "entities": [{
