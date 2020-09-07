@@ -1,6 +1,7 @@
 
 
 
+
 # Semantic Explorer API
 ## Root endpoint
 To see all available resources, go to: `/api/v1/?format=json`
@@ -49,12 +50,24 @@ Parameters that serve as filters, allow for modifiers. Each modifier can be appl
 * `gt` - greater than: *numeric values, dates, timestamps*
 * `gte` - greater than or equal: *numeric values, dates, timestamps*
 * `ne` - not equal: *strings, numeric values, dates, timestamps*
+* `all` - must include all mentioned values: *lists*
+* `any` - must include at least one of given values: *lists*
 
 Format: `paramname__modifier=value`
 Examples:
 
 	...&text__startswith=Rural
 	...&text__icontains=transport
+
+__WARNING:__ modifiers `all` and `any` can only be applied for the *ListFields* (such as *topics*), and in this case they should be divided by a vertical bar, for example the following param will return records that contain "land transportation" AND "livestock farming":
+
+    topics__all=land transportation|livestock farming
+The following parameter will return records that contain either "land transportation" OR "livestock farming":
+
+    topics__any=land transportation|livestock farming
+, and is equivalent to the following param:
+
+    topics=land transportation?topics=livestock farming
 
 The list of available filters and their modifiers are available in each endpoint's schema.
 ### Common parameters
