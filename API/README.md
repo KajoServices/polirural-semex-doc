@@ -315,7 +315,7 @@ The fields available for selection:
 - `domain`
 - `author`
 
-**NB**: If parameter `match` is specified, the search query will be applied to all fields mentioned above.
+**NB**: If the `match` parameter isn't present in the query, the search will be performed on all fields mentioned.
 
 #### Wildcard search
 For wildcard search use the star symbol (**\***):
