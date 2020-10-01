@@ -1,7 +1,3 @@
-
-
-
-
 # Semantic Explorer API
 ## Root endpoint
 To see all available resources, go to: `/api/v1/?format=json`
@@ -304,6 +300,33 @@ Possible values:
 - `app:regions:Region`
 - `feed:twitter:tweet`
 **Warning:** This list is extendable!
+
+#### Search by specific fields
+It is possible to use specified fields for search query. If more than one field specified for a search phrase, for each of them param `match` should be added to the request:
+
+    https://semex.io/api/v1/search/?query=agricultural biodiversity
+    	&match=text
+    	&match=description
+The fields available for selection:
+- `text`
+- `summary`
+- `description`
+- `url`
+- `domain`
+- `author`
+
+**NB**: If parameter `match` is specified, the search query will be applied to all fields mentioned above.
+
+#### Wildcard search
+For wildcard search use the star symbol (**\***):
+
+    https://semex.io/api/v1/search/?query=agri*
+    https://semex.io/api/v1/search/?query=agri*ral
+
+**Warning:** wildcards can only be used for single words. If applied to phrases, the result of the query will be empty:
+
+    https://semex.io/api/v1/search/?query=agri*ral policy
+
 
 ### Aggregated data (GET)
 Documents can be aggregated by geo-location (path in the response content: `["features"][<docindex>]["geometry"]["coordinates"]`) and timestamp (path: `["features"][<docindex>]["properties"]["created_at"]`).
