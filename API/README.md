@@ -74,32 +74,35 @@ The list of available filters and their modifiers are available in each endpoint
 * __offset__ - number of records to skip from the beginning. Together with "limit" is used to divide data to pages (pagination). Default: 20. Example: ...&offset=40
 
 ## Endpoints
-### Regional Library
-#### Plain list of sources (GET)
+### Library
+#### List of Library Sources (GET)
     https://semex.io/api/v1/library/?username=username&api_key=api_key
-#### Sorting library sources
+#### Sorting
 By default sources are sorted by the field *created_by* descending (latest first).
+
 For custom sorting use parameter `order_by` followed by the name of the field.
 
 Examples:
-Sorting by the owner (owners are users who create sources - in this particular case it will be sorted by username):
-    https://semex.io/api/v1/library/?order_by=owner
 
-Sorting by language descending:
-    https://semex.io/api/v1/library/?order_by=-lang
+ - Sort by owner (owners are users who create sources - in this particular case it will be sorted by username): https://semex.io/api/v1/library/?order_by=owner
+ - Sort by language descending: https://semex.io/api/v1/library/?order_by=-lang
 
-To sort by multiple fields use *order_by* parameter for each field:
-    https://semex.io/api/v1/library/?order_by=-updated_at&order_by=-lang
+##### Sorting by multiple fields
+When sorting by multiple fields is required, the parameter *order_by* should be repeated for each field:
+https://semex.io/api/v1/library/?order_by=-updated_at&order_by=-lang
 
-__WARNING:__ Order matters. Consider the following examples:
+ __WARNING:__ Order matters. Consider the following example:
 Sort by `source_type`, and then - within a set of each source type - sort by `created_at` descending:
     https://semex.io/api/v1/library/?order_by=source_type&order_by=-created_at
 
 
-#### Sorting by nested fields
-It is also possible to sort by fields that are represented as objects (for example, `owner`) - in the following example the output is sorted by the name of organization, which is represented by owner  (note that "name" is redundant, since this is a default field that represents an organization).
+##### Sorting by Nested Fields
+It is also possible to sort by fields that are represented as objects (for example, `owner`) - in the following example the output is sorted by the name of organization, which is represented by owner.
 
-	...&order_by=-owner__profile__organization
+	...&order_by=-owner__profile__organization__name
+
+NB: Normally, "name" is redundant, since it is a default field that represents an organization. Here it used for completeness of the example.
+
 #### Filtering
 Use names of fields for filtering in the same manner as parameters (see "Parameters" above):
 
@@ -122,7 +125,7 @@ The resulting list of objects can be sorted:
         &size_src__lte=500
         &order_by=-updated_at
 
-#### Time Range Filters
+##### Time Range Filters
 In addition to the standard modifiers (`__gt`, `__lte`, etc.) filtering by date fields (`created_at` and `updated_at`) can be performed using time ranges. Time-range is a string that consists of two dates (start and end), divided by vertical bar (|):
 
     https://semex.io/api/v1/library/
@@ -161,7 +164,8 @@ If the goal is to filter the records for the last day, use the following request
 
     https://semex.io/api/v1/library/
         &created_at=1 day ago|now
-#### Reserved keywords for Time Range Filters
+
+###### Reserved keywords for Time Range Filters
 Finally, there are reserved keywords, that don't require a pair of values: `today`, `yesterday`, `this week`, `last week`, `this month`, `last month`, `this year`, `last year`.
 
     https://semex.io/api/v1/library/
@@ -176,20 +180,42 @@ Filters based on time-ranges and reserved keywords are *inclusive*, i.e. they au
     https://semex.io/api/v1/library/
         ?created_at=2019-12-31T00:00:00|2019-12-31T23:59:59
 
-### Curated Reading List
-Curated Reading List (CRL) is a collection of sources on a certain topic or a list of topics (by "topic" here an abstract topic is meant, not the "topic" object in the Semantic Explorer).
-#### List of CRLs (GET)
-Access to the list of CRL: https://semex.io/api/v1/crl/?username=username&api_key=4f23...d3c4
-All mechanisms of filtering and sorting are available in the same way as for Library Sources.
-**Warning**: only registered users can access CRL endpoints.
+### Reading Lists
+A Reading List is a collection of sources (URLs) on a certain subject or  point of interest.
 
-#### CRL detail (GET)
-Detailed view of a certain CRL can be accessed in the following way:
+**Warning**: only registered users can access API endpoints for Reading Lists.
+
+#### Reading List vs. Library
+Internally Reading List is a collection of URLs and therefore in principle it isn't connected to Regional Library. However, every time a new Reading List is created, the links in the field `sources` are being added to the library for the faster processing in the future.
+
+#### Reading List processing work-flow
+In order to fill Reading List with data, a series if asynchronous background processes take place:
+- checking the presence of each resource is in the Library
+- creating those that aren't present: crawling, extracting text, semantic analysis
+- obtaining summary for each text and collecting it in a one big bag-of-sentences
+- performing a summary analysis on the bag-of-sentences
+- indexing a Reading List's text fields and performing semantic analysis on the resulting summary (NER, geo-parsing, topic extraction, polarity estimation, etc.)
+
+Right after the creation of the Reading List the server only returns `_id` of the new document and its completion status (`"completed": false`). It is also accompanied by the ("pessimistically") estimated time in the field `proc_time` (in milliseconds).
+
+When the processing of Reading List is over, the owner obtains email with the results and a direct link to the newly created document. Note that `proc_time` in the processed Reading List is set to the actual value of the time required to complete the process, and therefore is different from the estimated time.
+
+To check if processing is finished is to periodically request a Reading List's `_id`:
+https://semex.io/api/v1/crl/crl_id/?username=username&api_key=4f23...d3c4,
+(`crl_id` is a UUID returned after the creation) and check the value of the  field `completed` which is se to `true` upon completion.
+
+#### List of Reading Lists (GET)
+Available Reading Lists can be obtained via https://semex.io/api/v1/crl/?username=username&api_key=4f23...d3c4
+
+Filtering and sorting are available in the same way as for Library Sources - see [Sorting](Sorting) and [Filtering](Filtering).
+
+#### Reading List detail (GET)
+A detailed information of a selected Reading List can be accessed in the following way:
 https://semex.io/api/v1/crl/crl_id/?username=username&api_key=4f23...d3c4
 where `crl_id` is a UUID returned after the creation, or can be found in the list.
 
-#### New CRL (POST)
-Example of creating a new CRL (warning: URLs are fictional, use your own list of links):
+#### New Reading List (POST)
+Example of creating a new Reading List (**warning**: URLs are fictional, use your own list of links):
 
     POST https://semex.io/api/v1/crl/?username=username&api_key=4f23...d3c4 \
     --header 'Content-Type: application/json' \
@@ -205,17 +231,6 @@ Example of creating a new CRL (warning: URLs are fictional, use your own list of
          ]
     }'
 
-Internally CRL is a collection of URLs and therefore in principle it isn't connected to Regional Library. However, every time a new CRL is created, all the links are added to the library for the faster processing in the future. This explains, why upon creation of a CRL the server only returns the status and `_id`: in order to fill CRL with data, a series if asynchronous background processes take place:
-- checking the presence of each resource is in the Library
-- creating those that aren't: crawling, extracting text, analyzing it semantically
-- getting summary from each text and collecting it in a one big bag-of-sentences
-- performing a summary analysis on the bag-of-sentences
-- indexing CRL's text fields and performing semantic analysis on the resulting summary (NER, geo-parsing, topic extraction, polarity estimation, etc.)
-
-One way to check if the processing of CRL is finished is to periodically request its `_id` (returned after the creation):
-https://semex.io/api/v1/crl/crl_id/?username=username&api_key=4f23...d3c4,
-where `crl_id` is a UUID returned after the creation.
-The indicator that processing is finished would be data in the field `summary` (which is an empty list right after creation).
 #### Updating CRL (PUT, PATCH)
 To update only certain fields of a CRL a `PATCH` request should be issued:
 
@@ -232,9 +247,31 @@ To update only certain fields of a CRL a `PATCH` request should be issued:
     }'
 A background processing will take place only if the field `sources` is changed - in this case the fields `summary`, `keywords`, and `urls_ext` are cleared up, and then the process will be repeated in the same way and order as after the creation of a CRL. In all other cases only field update takes place.
 **Warning**: if the list of sources should be changed, all URLs must be provided - not only those that are added to existing list.
+
 `PUT` request means full update, i.e. all fields will be re-written. If values for some required fields aren't provided in `PUT`, it will cause an error `400 Bad Request`.
-#### Deleting CRL (DELETE)
-No users are authorized to delete a CRL except of admins. For CRL to disappear from the list, it is advisable to set their status `is_active` to `"false"` and to display list filtered by adding parameter `&is_active=true` to the list.
+
+##### Force reprocess Reading List
+Normally Reading List is being re-processed automatically only when its sources is changed. In case a manual re-processing is necessary, it is enough to PATCH a List with the filed `completed` set to `false` as shown below. This will start re-processing, even if the list of sources remained unchanged.
+
+    PATCH https://semex.io/api/v1/crl/?username=username&api_key=4f23...d3c4 \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "completed": false
+    }'
+
+#### Deleting Reading List (PATCH and DELETE)
+No users are authorized to delete a Reading List except of admins. For Reading List to disappear from the list of available documents, simply set their status `is_active` to `"false"`.
+
+    PATCH https://semex.io/api/v1/crl/?username=username&api_key=4f23...d3c4 \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "is_active": false
+    }'
+To display only active documents use the filter `&is_active=true`.
+
+To delete a Reading List from the DB, use DELETE method:
+
+    DELETE https://semex.io/api/v1/crl/?username=username&api_key=4f23...d3c4
 
 ### Search
 Search endpoint is available at the following URL:
@@ -315,7 +352,7 @@ The fields available for selection:
 - `domain`
 - `author`
 
-**NB**: If the `match` parameter isn't present in the query, the search will be performed on all fields mentioned.
+**NB**: If parameter `match` is specified, the search query will be applied to all fields mentioned above.
 
 #### Wildcard search
 For wildcard search use the star symbol (**\***):
@@ -386,6 +423,7 @@ In Semantic Explorer database sentiment is stored in the field `polarity`. Date-
     	&agg_polarity__interval=90m
 
 This indicates calculation of the average sentiment for each timestamp bucket. In the example above in each bucket (1.5hrs long) in addition to `doc_count` will contain `avg_polarity`.
+
 ### User feedback (PATCH)
 A registered user can leave a feedback for any particular document:
 
@@ -416,9 +454,10 @@ A registered user can leave a feedback for any particular document:
         }
     }'
 
-
 The comment will automatically be stamped with a date-time mark and a link to a user profile.
+
 **Warning**: feedback is a paragraph based. It is impossible (and useless) to leave a feedback for the whole document.
+
 **Warning**: 
 feedback don’t have history, i.e. it is possible only to re-write a comment, but not to add one. However, if a user wants to leave a feedback for an article that is already commented by someone else, a new comment will be added.
 
