@@ -365,52 +365,42 @@ For wildcard search use the star symbol (**\***):
     https://semex.io/api/v1/search/?query=agri*ral policy
 
 
-### Aggregated data (GET)
-Documents can be aggregated by geo-location (path in the response content: `["features"][<docindex>]["geometry"]["coordinates"]`) and timestamp (path: `["features"][<docindex>]["properties"]["created_at"]`).
+#### Aggregations (GET)
+In the /search/ endpoint documents can be aggregated by any field. Aggregation must be defined as a dictionary in the format of Elasticsearch query for [Bucket Aggregations](https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-aggregations-bucket.html) without quotes.
+
+The definition of aggregation differs from the other parameters by adding a prefix: `agg__FOO`. Instead of `FOO` there can be any string of alphanumeric symbols and underscore (`_`). This name is used to find the results of aggregation in the content of the response.
+
+Aggregations can be combined with filtering and search keywords:
+
+    https://semex.io/api/v1/search/ \
+        ?lang=en \
+        &query=land mobility \
+        &agg__topics={terms:{field:topics,size:20}}
+Aggregations can also be nested:
+
+    https://semex.io/api/v1/search/ \
+        ?lang=en \
+        &debug__query \
+        &query=land mobility \
+        &agg__topics={terms:{field:topics,size:20}, \
+            aggs:{agg__polarity_scores:{histogram: \
+            {field:polarity,interval:0.5}}}}
+
+It is possible to define more than one aggregation in a single query - however it isn't recommended, because aggregation is a time-consuming operation and therefore can either slow down the responses to other queries or simply result in a long response time.
+
+    https://semex.io/api/v1/search/? \
+        lang=en \
+        &query=land mobility \
+        &agg__topics={terms:{field:topics,size:20},aggs:{agg__polarity_scores:{histogram:{field:polarity,interval:0.5}}}} \
+        &agg__polarity_scores={histogram:{field:polarity,interval:0.5},aggs:{agg__topics:{terms:{field:topics,size:20}}}}
 
 If any of the aggregation parameters appear in the request, the response contains additional field “aggregations”, where a summarized number of documents are gathered in “buckets”, and sorted accordingly (see below).
 
-If you are interested in aggregated results only, it is possible not to include original documents entirely by setting `size` param to zero (see example below). In this case the field `features` will still be present in the response to comply with GeoJSON format, but it will be an empty list.
+If you are interested in aggregated results only, it is possible not to include original documents entirely by setting `size` param to zero (see example below). In this case the field `objects` will still be present in the response to comply with GeoJSON format, but it will be an empty list.
 
     https://semex.io/api/v1/library/
-	    ?agg_hotspot=true
+	    ?&agg__name=<...>
     	&size=0
-
-##### Aggregation by geo-location
-
-    https://semex.io/api/v1/library/
-	    ?loc_country=Poland
-    	&agg_hotspot=true
-    	&agg_hotspot__precision=4
-    	&agg_hotspot__size=1000
-
-`agg_hotspot__precision` parameter (integer) takes values between 1 and 12 and indicates how precise an aggregation is on a map: *1* is 5,009.4km x 4,992.6km, *12* is 3.7cm x 1.9cm (full list - https://www.elastic.co/guide/en/elasticsearch/reference/6.2//search-aggregations-bucket-geohashgrid-aggregation.html#_cell_dimensions_at_the_equator). Default is 5. Be careful to use very high precision, as it is RAM-greedy, while generally not being very useful for in each hotspot it is statistically being aggregated 2-3 documents.
-
-`agg_hotspot__size` - maximum number of buckets to return (default is 10,000). When results are trimmed, buckets are prioritized based on the number of documents they contain (`doc_count`).
-
-Buckets are sorted by `doc_count` descending (bigger at the top).
-
-##### Aggregation by created_at (date-time histogram)
-    https://semex.io/api/v1/library/
-	    ?loc_country=Poland
-    	&agg_timestamp=true
-    	&agg_timestamp__interval=90m
-
-`agg_timestamp__interval` defines interval for collecting records. Available expressions for interval:
-* year - `1y`
-* quarter - `1q`
-* month - `1M`
-* week - `1w`
-* day - `1d`
-* hour - `1h`
-* minute - `1m`
-* second - `1s`
-
-Fractional time values are not supported, but it is possible to achieve the goal shifting to another time unit: e.g., `1.5h` could instead be specified as `90m`
-
-**Warning**: time intervals larger than than days do not support arbitrary values but can only be one unit large at its maximum, e.g. `1w` is valid, `2w` is not. For large intervals use days: for example, for a precision value of two weeks use `14d`.
-
-Buckets are sorted by timestamps of the intervals, ascending.
 
 ##### Date-time histogram with average sentiment
 In Semantic Explorer database sentiment is stored in the field `polarity`. Date-time histogram with average values of polarity is being obtained on the following way:
