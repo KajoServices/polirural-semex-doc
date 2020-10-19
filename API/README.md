@@ -118,7 +118,7 @@ Filters can be combined:
 
 The resulting list of objects can be sorted:
 
-    https://semex.io/api/v1/library/ \
+    https://semex.io/api/v1/library/
         ?source_type=application/pdf
         &lang=it
         &created_at__gte=2020-02-18
@@ -293,7 +293,8 @@ Note that in the latter example, search will be performed by all text fields. If
 #### Search with filtering
 Search can be combined with filters:
 
-    https://semex.io/api/v1/search/?query=agricultural biodiversity
+    https://semex.io/api/v1/search/
+        ?query=agricultural biodiversity
     	&created_at=last month
     	&loc_country=Belgium
     	&order_by=-created_at
@@ -372,29 +373,77 @@ The definition of aggregation differs from the other parameters by adding a pref
 
 Aggregations can be combined with filtering and search keywords:
 
-    https://semex.io/api/v1/search/ \
-        ?lang=en \
-        &query=land mobility \
-        &agg__topics={terms:{field:topics,size:20}}
+    https://semex.io/api/v1/search/
+        ?lang=en
+        &query=land mobility
+        &agg__topics={
+            terms: {
+                field: topics,
+                size: 20
+            } \
+        }
+**NB:** the indentation here and below serves the purpose of readability. The aforementioned request can be written like this:
+
+    https://semex.io/api/v1/search/?lang=en&query=land mobility&agg__topics={terms:{field:topics,size:20}}
+
 Aggregations can also be nested:
 
-    https://semex.io/api/v1/search/ \
-        ?lang=en \
-        &debug__query \
-        &query=land mobility \
-        &agg__topics={terms:{field:topics,size:20}, \
-            aggs:{agg__polarity_scores:{histogram: \
-            {field:polarity,interval:0.5}}}}
+    https://semex.io/api/v1/search/
+        ?lang=en
+        &debug__query
+        &query=land mobility
+        &agg__topics={
+            terms: {
+                field: topics,
+                size: 20
+            },
+            aggs: {
+                agg__polarity_scores: {
+                    histogram: {
+                        field: polarity,
+                        interval: 0.5
+                    }
+                }
+            }
+        }
 
 It is possible to define more than one aggregation in a single query - however it isn't recommended, because aggregation is a time-consuming operation and therefore can either slow down the responses to other queries or simply result in a long response time.
 
-    https://semex.io/api/v1/search/? \
-        lang=en \
-        &query=land mobility \
-        &agg__topics={terms:{field:topics,size:20},aggs:{agg__polarity_scores:{histogram:{field:polarity,interval:0.5}}}} \
-        &agg__polarity_scores={histogram:{field:polarity,interval:0.5},aggs:{agg__topics:{terms:{field:topics,size:20}}}}
+    https://semex.io/api/v1/search/
+        ?lang=en
+        &query=land mobility
+        &agg__topic_groups={
+            terms: {
+                field: topics,
+                size: 20
+            },
+            aggs: {
+                agg__polarities: {
+                    histogram: {
+                        field: polarity,
+                        interval: 0.5
+                    }
+                }
+            }
+        }
+        &agg__polarity_scores={
+            histogram: {
+                field: polarity,
+                interval: 0.5
+            },
+            aggs: {
+                agg__topics: {
+                    terms: {
+                        field: topics,
+                        size: 20
+                    }
+                }
+            }
+        }
 
-If any of the aggregation parameters appear in the request, the response contains additional field “aggregations”, where a summarized number of documents are gathered in “buckets”, and sorted accordingly (see below).
+If any of the aggregation parameters appear in the request, the response contains additional field “aggregations”, where a summarized number of documents (or other specified aggregations) are gathered in “buckets” and sorted accordingly.
+
+**NB:** In the example the names `agg__topic_groups`, `agg__polarities`, `agg__polarity_scores` and `agg__topics` are user-defined. They should be properly named keys for a JSON format (a-z, A-Z, 0-9, underscore, no spaces). and those are the names of sections in the response with results of aggregations.
 
 If you are interested in aggregated results only, it is possible not to include original documents entirely by setting `size` param to zero (see example below). In this case the field `objects` will still be present in the response to comply with GeoJSON format, but it will be an empty list.
 
