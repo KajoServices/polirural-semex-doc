@@ -1,3 +1,4 @@
+
 # Semantic Explorer API
 ## Root endpoint
 To see all available resources, go to: `/api/v1/?format=json`
@@ -180,6 +181,23 @@ Filters based on time-ranges and reserved keywords are *inclusive*, i.e. they au
     https://semex.io/api/v1/library/
         ?created_at=2019-12-31T00:00:00|2019-12-31T23:59:59
 
+### Landscapes and Regions
+In Semantic Explorer territorial references represented by:
+- Regions - an administrative unit as defined in Global List of Administrative Units (GAUL) level 1. Access the list of regions at https://semex.io/api/v1/region/?username=username&api_key=api_key
+- Landscapes - Pilot area "composed" of several regions, i.e. one Landscape can one or more Regions. The list of Landscapes can be accessed at https://semex.io/api/v1/landscape/?username=username&api_key=api_key
+
+Filtering and sorting are available in the same way as for Library Sources - see [Sorting](Sorting) and [Filtering](Filtering).
+
+#### Connections to Library and Organizations
+Landscapes are connected to the Organizations, while Regions - to Sources from the Library. This creates a possibility for users from one Organization to connect sources to different Regions, not necessarily to the Regions they operate in.
+
+#### Connections to external geoshape references
+Regions are connected to GAUL via the field `g2008_1_id` - this is a unique ID of the geoshape in the GAUL reference that represents a certain administrative unit (for example, Nitra, Slovakia or Flanders, Belgium).
+
+An additional field `geoshape_id` is pointing to the region in the geo-parser maintained by the developer (KAJO). Please contact suppport to get access to the geo-parser. 
+
+Landscape is more "abstract" geo-shape - it can either be locality or a region, or a county, or the whole country. Thus it is connected to the only to geo-parser maintained by KAJO via the field `geoshape_id`. 
+
 ### Reading Lists
 A Reading List is a collection of sources (URLs) on a certain subject or  point of interest.
 
@@ -301,6 +319,7 @@ Search can be combined with filters:
 All the rules applied to the filtering of Regional Library is applicable in this case. All possible options for filtering can be found in schema of the resource:
     https://semex.io/api/v1/search/schema?format=json
 
+##### Search with filtering by Source Type
 There is one particular field that requires a special mention: `source_type`. Its value explains the origin of the document and in combination with `source_id` is used to track the original document.  The value in `source_type` always consists of three parts, each of which refers to module, application within the module and data model within application. For example, consider the following fragment:
 
     {
@@ -338,6 +357,12 @@ Possible values:
 - `app:regions:Region`
 - `feed:twitter:tweet`
 **Warning:** This list is extendable!
+
+##### Search with filtering by Regions
+It is possible to filter search results by a certain region. If it is necessary to filter by administrative region (see [Landscapes and Regions](Landscapes%20and%20Regions)), the field `loc_admin_region` refers to the name of administrative region:
+
+    https://semex.io/api/v1/search/?query=rural areas
+    	&loc_admin_region=Vidzeme
 
 #### Search by specific fields
 It is possible to use specified fields for search query. If more than one field specified for a search phrase, for each of them param `match` should be added to the request:
