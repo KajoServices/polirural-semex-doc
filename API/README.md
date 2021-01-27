@@ -146,8 +146,12 @@ The resulting list of objects can be sorted:
         &size_src__lte=500
         &order_by=-updated_at
 
-It is possible to use multiple filters on almost all fields of Library (except of `created_at`, `updated_at`, `meta_request`, `meta_src`). The following requests will produce the same result:
+It is possible to use multiple filters on almost all fields of Library (except of `created_at`, `updated_at`, `meta_request`, `meta_src`).
+
+The following requests will produce the same result:
+
 `api/v1/library/?lang=it&lang=en`
+
 `api/v1/library/?lang__in=it,en`
 
 ##### Time Range Filters
