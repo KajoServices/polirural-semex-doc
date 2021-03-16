@@ -544,48 +544,91 @@ In Semantic Explorer database sentiment is stored in the field `polarity`. Date-
 
 This indicates calculation of the average sentiment for each timestamp bucket. In the example above in each bucket (1.5hrs long) in addition to `doc_count` will contain `avg_polarity`.
 
-### User feedback (PATCH)
-
-A registered user can leave a feedback for any particular document:
-
-    PATCH api/v1/library/<source_id>/<paragraph_number>/?api_key=<user_api_key>&username=<username-or-email>
-    Content-Type: application/json
-    data = '{
-        "feedback": {
-            "topics": [
-	            "natural disaster",
-                ],
-            "relevant": false,
-            "note": "This has nothing to do with natural disaster: this paragraph is about population decline!"
-        }
-    }'
-
-    PATCH api/v1/library/<source_id>/<paragraph_number>/?api_key=<user_api_key>&username=<username-or-email>
-    Content-Type: application/json
-    data = '{
-        "feedback": {
-            "entities": [{
-	            "text": "natural disaster",
-	            "start_char": 12,
-	            "end_char": 28,
-	            "label": "GPE"
-                ],
-            "relevant": false,
-            "note": "Not an entity, just a text!"
-        }
-    }'
+### User feedback
+In cases when results of Semantic Analysis are in some way unsatisfactory, it is possible to leave a feedback.
 
 The comment will automatically be stamped with a date-time mark and a link to a user profile.
 
-**Warning**: feedback is a paragraph based. It is impossible (and useless) to leave a feedback for the whole document.
+**Warning:** only registered users can leave feedbacks!
 
-**Warning**: 
-feedback don’t have history, i.e. it is possible only to re-write a comment, but not to add one. However, if a user wants to leave a feedback for an article that is already commented by someone else, a new comment will be added.
+The following cases are supported:
+- wrong topic in text
+- wrong entity text
+- incorrectly defined label for an entity
+- incorrect entity annotation
+- incorrect estimation of polarity
 
-The structure of the feedback itself is free-form for as long as user keep all valuable information in a form of dictionary under the `feedback` key. However, for the procedural simplicity we suggest keeping the following keys, when giving a feedback:
-*  `<fieldname>` - `<list>` of values that are considered as relevant to the subject of a current paragraph. This can either be a subset of original `topics` key, or entirely new topics, or combination of both. Class can also be Named Entity - for example, it is possible to change a label of the entity or discard the entity entirely, if it was detected mistakenly. By "class" here is meant a category or a keyword that somehow describes a topic of a given document. *Example of  implementation*: a checkbox'ed list of `topics`, from which checked items become `classes` in the feedback.
-* `relevant` - `<bool>` indicating whether a found document (a tweet in its entirety or a paragraph of a library source) is relevant to the topic. This key is optional, if tweet is considered to be relevant, while a user wants to specify a list of classes (see above) or simply to leave a note.
-* `note` - `<str>` (optional) comment on the reason of leaving feedback.
+In case of wrong topic:
+
+    POST /api/v1/feedback/?username=username&api_key=4f23...d3c4 \
+        --header 'Content-Type: application/json' \
+        --data '{
+            "text": "Logging messages are encoded as instances of the LogRecord class. When a logger decides to actually log an event, a LogRecord instance is created from the logging message.",
+            "lang": "en",
+            "feature": "topic",
+            "value": {"text": "residential area"},
+			"action": "delete",
+		    "reason": "irrelevant"
+        }'
+
+Feedback is a text-oriented, but it is also possible to leave a feedback for any particular paragraph in any document. In this case `data` in the previous example should take the following form:
+
+    {
+        "source_type": "app:readlst:ReadingList",
+        "source_id": "5ffefe21e97f91b6bc72fe6b",
+        "para_order": 0,
+        "text": "Logging messages are encoded as instances of the LogRecord class. When a logger decides to actually log an event, a LogRecord instance is created from the logging message.",
+        "lang": "en",
+        "feature": "topic",
+        "value": {"text": "residential area"},
+    	"action": "delete",
+    	"reason": "irrelevant"
+    }
+
+**Warning**: feedback is a paragraph based. It is impossible (and useless) to leave a feedback for the whole document. Therefore all three fields are mandatory: `source_type`, `source_id` and `para_order`, otherwise API will return an error 400.
+
+#### Reasons
+
+`reason` is a free-form text limited to 255 characters. The three basic reasons are: "incorrect", "irrelevant" and "outdated".
+
+#### Required parameters
+
+Different features (topic, entity, etc.) require different set of parameters in the `value` field:
+- `topic`: "text"
+- `entity`: "text", "label", "start_char", "end_char" (and optionally - "annotation", i.e. should repeat the structure of the Entity object)
+- `label`: the same as `entity`
+- `annotation`: the same as `entity`
+- `polarity`: "polarity"
+
+#### Actions
+
+There are three available actions: `add`, `delete`,  and `replace`, of which `replace` requires another one field in the structure: `replace`, which should repeat the structure of the field `value`.
+
+Example - replacing entity's text (**warning**: in such cases  `start_char` and `end_char` should also be updated):
+
+    POST /api/v1/feedback/?username=username&api_key=4f23...d3c4 \
+        --header 'Content-Type: application/json' \
+        --data '{
+            "text": "Kultūras ministrijai sagatavot un kultūras ministram līdz 2021. gada 1. martam iesniegt noteiktā kārtībā Ministru kabinetā ORG informatīvo ziņojumu par plāna izpildi.",
+            "lang": "sk",
+            "feature": "entity",
+            "value": {
+                "text": "kabinetā",
+                "annotation": "",
+                "label": "ORG",
+                "start_char": 114,
+                "end_char": 122
+            },
+            "replace": {
+                "text": "Ministru kabinetā",
+                "annotation": "",
+                "label": "ORG",
+                "start_char": 105,
+                "end_char": 122
+            },
+            "action": "replace",
+            "reason": "incorrect"
+        }'
 
 ### Semantic Analysis
 
