@@ -753,8 +753,8 @@ Parameters:
 Text summary, i.e. the most representative sentences from the text.
 
 Parameters:
-	- `keywords <int>` (default 15) - defined how many top keywords are used to summarize the document (the bigger the number of keywords, the broader the summary).
-	- `sentences <int>` (default 5) - how many sentences should be returned.
+- `keywords <int>` (default 15) - defined how many top keywords are used to summarize the document (the bigger the number of keywords, the broader the summary).
+- `sentences <int>` (default 5) - how many sentences should be returned.
 
 ##### topics
 
@@ -770,7 +770,7 @@ Parameters:
 There can be three types of input:
 - `text` - plain text of an arbitrary length.
 - `url` - a proper URL pointing to some text in the internet. In this case the URL is first scraped (which adds overhead to the response depending on the source size)
-- `source_id` - a unique ID of the source from the Regional Library (this is generally not necessary, since all the documents from Regional Library are being constant;y updated and analyzed).
+- `source_id` - a unique ID of the source from the Regional Library (this is generally not necessary, since all the documents from Regional Library are being constantly updated and analyzed).
 
 Example of analyzing a text:
 
